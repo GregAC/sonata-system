@@ -66,6 +66,7 @@
             uf2conv
             # For legacy software
             lowrisc-toolchain-gcc-rv32imcb
+            llvm_cheriot
           ])
           ++ (with sonata-simulator; buildInputs ++ nativeBuildInputs);
       };
