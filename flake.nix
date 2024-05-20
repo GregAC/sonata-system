@@ -58,9 +58,6 @@
             screen
             picocom
             srecord
-            gtkwave
-            openfpgaloader
-            openocd
           ])
           ++ (with lr_pkgs; [
             uf2conv
