@@ -7,6 +7,7 @@
 package tl_main_pkg;
 
   localparam logic [31:0] ADDR_SPACE_SRAM        = 32'h 00100000;
+  localparam logic [31:0] ADDR_SPACE_HYPERRAM    = 32'h 40000000;
   localparam logic [31:0] ADDR_SPACE_REV_TAG     = 32'h 30000000;
   localparam logic [31:0] ADDR_SPACE_GPIO        = 32'h 80000000;
   localparam logic [31:0] ADDR_SPACE_PWM         = 32'h 80001000;
@@ -33,6 +34,7 @@ package tl_main_pkg;
   localparam logic [31:0] ADDR_SPACE_RV_PLIC     = 32'h 88000000;
 
   localparam logic [31:0] ADDR_MASK_SRAM        = 32'h 0003ffff;
+  localparam logic [31:0] ADDR_MASK_HYPERRAM    = 32'h 000fffff;
   localparam logic [31:0] ADDR_MASK_REV_TAG     = 32'h 00003fff;
   localparam logic [31:0] ADDR_MASK_GPIO        = 32'h 00000fff;
   localparam logic [31:0] ADDR_MASK_PWM         = 32'h 00000fff;
@@ -59,34 +61,35 @@ package tl_main_pkg;
   localparam logic [31:0] ADDR_MASK_RV_PLIC     = 32'h 03ffffff;
 
   localparam int N_HOST   = 2;
-  localparam int N_DEVICE = 25;
+  localparam int N_DEVICE = 26;
 
   typedef enum int {
     TlSram = 0,
-    TlRevTag = 1,
-    TlGpio = 2,
-    TlPwm = 3,
-    TlRpiGpio = 4,
-    TlArdGpio = 5,
-    TlPmodGpio = 6,
-    TlRgbledCtrl = 7,
-    TlTimer = 8,
-    TlUart0 = 9,
-    TlUart1 = 10,
-    TlUart2 = 11,
-    TlUart3 = 12,
-    TlUart4 = 13,
-    TlI2C0 = 14,
-    TlI2C1 = 15,
-    TlSpiFlash = 16,
-    TlSpiLcd = 17,
-    TlSpiEth = 18,
-    TlSpiRp0 = 19,
-    TlSpiRp1 = 20,
-    TlSpiArd = 21,
-    TlSpiMkr = 22,
-    TlUsbdev = 23,
-    TlRvPlic = 24
+    TlHyperram = 1,
+    TlRevTag = 2,
+    TlGpio = 3,
+    TlPwm = 4,
+    TlRpiGpio = 5,
+    TlArdGpio = 6,
+    TlPmodGpio = 7,
+    TlRgbledCtrl = 8,
+    TlTimer = 9,
+    TlUart0 = 10,
+    TlUart1 = 11,
+    TlUart2 = 12,
+    TlUart3 = 13,
+    TlUart4 = 14,
+    TlI2C0 = 15,
+    TlI2C1 = 16,
+    TlSpiFlash = 17,
+    TlSpiLcd = 18,
+    TlSpiEth = 19,
+    TlSpiRp0 = 20,
+    TlSpiRp1 = 21,
+    TlSpiArd = 22,
+    TlSpiMkr = 23,
+    TlUsbdev = 24,
+    TlRvPlic = 25
   } tl_device_e;
 
   typedef enum int {

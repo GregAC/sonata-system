@@ -271,7 +271,70 @@ set_property -dict { PACKAGE_PIN D4  IOSTANDARD LVCMOS18 } [get_ports ethmac_cip
 set_property -dict { PACKAGE_PIN H6  IOSTANDARD LVCMOS18  PULLTYPE PULLUP } [get_ports ethmac_intr];
 set_property -dict { PACKAGE_PIN H5  IOSTANDARD LVCMOS18 } [get_ports ethmac_cs];
 
+# HyperRAM
+set_property -dict { PACKAGE_PIN   B1  IOSTANDARD   LVCMOS18 } [get_ports { HYPERRAM_DQ[0] }];
+set_property -dict { PACKAGE_PIN   E2  IOSTANDARD   LVCMOS18 } [get_ports { HYPERRAM_DQ[1] }];
+set_property -dict { PACKAGE_PIN   H1  IOSTANDARD   LVCMOS18 } [get_ports { HYPERRAM_DQ[2] }];
+set_property -dict { PACKAGE_PIN   A1  IOSTANDARD   LVCMOS18 } [get_ports { HYPERRAM_DQ[3] }];
+set_property -dict { PACKAGE_PIN   E1  IOSTANDARD   LVCMOS18 } [get_ports { HYPERRAM_DQ[4] }];
+set_property -dict { PACKAGE_PIN   B2  IOSTANDARD   LVCMOS18 } [get_ports { HYPERRAM_DQ[5] }];
+set_property -dict { PACKAGE_PIN   C1  IOSTANDARD   LVCMOS18 } [get_ports { HYPERRAM_DQ[6] }];
+set_property -dict { PACKAGE_PIN   D2  IOSTANDARD   LVCMOS18 } [get_ports { HYPERRAM_DQ[7] }];
+
+set_property -dict { PACKAGE_PIN   F1  IOSTANDARD   LVCMOS18 } [get_ports { HYPERRAM_RWDS }];
+set_property -dict { PACKAGE_PIN   H2  IOSTANDARD   LVCMOS18 } [get_ports { HYPERRAM_CKP }];
+set_property -dict { PACKAGE_PIN   G2  IOSTANDARD   LVCMOS18 } [get_ports { HYPERRAM_CKN }];
+set_property -dict { PACKAGE_PIN   C2  IOSTANDARD   LVCMOS18 } [get_ports { HYPERRAM_nRST }];
+set_property -dict { PACKAGE_PIN   J2  IOSTANDARD   LVCMOS18 } [get_ports { HYPERRAM_CS }];
+
 ## Voltage and bistream
 set_property CFGBVS VCCO [current_design]
 set_property CONFIG_VOLTAGE 3.3 [current_design]
 set_property BITSTREAM.GENERAL.COMPRESS TRUE [current_design]
+
+
+############################################################################
+# HyperRAM, adapted (ports renamed; set current_instance) from OpenHBMC.xdc:
+############################################################################
+current_instance u_sonata_system/u_hyperram/U_HBMC
+
+# Set output false path, timings are met by design
+set_false_path -to [get_ports HYPERRAM_CKP]
+set_false_path -to [get_ports HYPERRAM_CKN]
+set_false_path -to [get_ports HYPERRAM_RWDS]
+set_false_path -to [get_ports HYPERRAM_DQ[*]]
+
+# Set input false path. DQ[*] and RWDS are supposed to
+# be fully asynchronous for the data recovery logic
+set_false_path -from [get_ports HYPERRAM_RWDS]
+set_false_path -from [get_ports HYPERRAM_DQ[*]]
+
+#----------------------------------------------------------------------------
+
+# Pack 'cs_n' and 'reset_n' registers in IOBs for best output timings
+set_property IOB TRUE [get_cells -hierarchical cs_n_reg]
+set_property IOB TRUE [get_cells -hierarchical reset_n_reg]
+
+# False path for 'hb_cs_n' and 'hb_reset_n'
+set_false_path -to [get_ports HYPERRAM_CS]
+set_false_path -to [get_ports HYPERRAM_nRST]
+
+#----------------------------------------------------------------------------
+
+# Single bit synchronizer false path
+set_false_path -to [get_pins -hierarchical *d_sync_reg*[0]/D]
+
+#----------------------------------------------------------------------------
+
+# Asynchronous reset synchronizer false path
+set_false_path -through [get_pins -of_objects [get_cells -hierarchical *hbmc_arst_sync*] -filter {NAME =~ *arst}]
+
+#----------------------------------------------------------------------------
+
+# Set minimum period of 'clk_hbmc_0' (200MHz)
+set clk_hbmc_0_min_period 5.000
+
+# Set max delay constraint for 'hbmc_bus_sync' data path for at least 2 stages of single bit synchronizer (PERIOD * 2)
+set_max_delay [expr {$clk_hbmc_0_min_period * 2}] -through [get_pins -of_objects [get_cells -hierarchical hbmc_bus_sync*] -filter {NAME =~ *src_data*}]
+
+#----------------------------------------------------------------------------

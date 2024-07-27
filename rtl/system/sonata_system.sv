@@ -23,7 +23,8 @@ module sonata_system #(
   parameter int unsigned PwmWidth      = 12,
   parameter int unsigned CheriErrWidth =  9,
   parameter SRAMInitFile               = "",
-  parameter int unsigned SysClkFreq    = 30_000_000
+  parameter int unsigned SysClkFreq    = 30_000_000,
+  parameter int unsigned HRClkFreq     = 100_000_000
 ) (
   // Main system clock and reset
   input logic                      clk_sys_i,
@@ -32,6 +33,11 @@ module sonata_system #(
   // USB device clock and reset
   input logic                      clk_usb_i,
   input logic                      rst_usb_ni,
+
+  // Hyperram clocks and reset
+  input logic                      clk_hr_i,
+  input logic                      clk_hr90p_i,
+  input logic                      clk_hr3x_i,
 
   // General purpose input and output
   input  logic [GpiWidth-1:0]      gp_i,
@@ -145,15 +151,22 @@ module sonata_system #(
   output logic                     usb_dn_pullup_o,
   output logic                     usb_rx_enable_o,
 
-  output logic                     rgbled_dout_o
+  output logic                     rgbled_dout_o,
+
+  inout  wire [7:0]                hyperram_dq,
+  inout  wire                      hyperram_rwds,
+  output wire                      hyperram_ckp,
+  output wire                      hyperram_ckn,
+  output wire                      hyperram_nrst,
+  output wire                      hyperram_cs
 );
 
   ///////////////////////////////////////////////
   // Signals, types and parameters for system. //
   ///////////////////////////////////////////////
 
-  localparam int unsigned MemSize       = 256 * 1024; // 256 KiB
-  localparam int unsigned SRAMAddrWidth = $clog2(MemSize);
+  localparam int unsigned SRAMSize      = 128 * 1024; // 256 KiB
+  localparam int unsigned SRAMAddrWidth = $clog2(SRAMSize);
   localparam int unsigned DebugStart    = 32'h1a110000;
   localparam int unsigned PwmCtrSize    = 8;
   localparam int unsigned BusAddrWidth  = 32;
@@ -161,6 +174,7 @@ module sonata_system #(
   localparam int unsigned BusDataWidth  = 32;
   localparam int unsigned RegAddrWidth  = 8;
   localparam int unsigned TRegAddrWidth = 16;  // Timer uses more address bits.
+  localparam int unsigned HRSize        = 1024 * 1024; // 1 MiB
 
   // The number of data bits controlled by each mask bit; since the CPU requires
   // only byte level access, explicitly grouping the data bits makes the inferred
@@ -406,8 +420,7 @@ module sonata_system #(
   logic [BusDataWidth-1:0] core_instr_rdata;
   logic                    core_instr_err;
 
-  assign core_instr_req_filtered =
-      core_instr_req & ((core_instr_addr & ~(tl_main_pkg::ADDR_MASK_SRAM)) == tl_main_pkg::ADDR_SPACE_SRAM);
+  assign core_instr_req_filtered = core_instr_req;
 
   // Temporal safety signals.
   localparam int unsigned    TsMapAddrWidth = 16;
@@ -463,10 +476,16 @@ module sonata_system #(
   tlul_pkg::tl_d2h_t tl_dbg_host_d2h_q;
 
   // Device interfaces.
-  tlul_pkg::tl_h2d_t tl_sram_h2d_d;
-  tlul_pkg::tl_d2h_t tl_sram_d2h_d;
-  tlul_pkg::tl_h2d_t tl_sram_h2d_q;
-  tlul_pkg::tl_d2h_t tl_sram_d2h_q;
+  tlul_pkg::tl_h2d_t tl_sram_a_h2d_d;
+  tlul_pkg::tl_d2h_t tl_sram_a_d2h_d;
+  tlul_pkg::tl_h2d_t tl_sram_a_h2d_q;
+  tlul_pkg::tl_d2h_t tl_sram_a_d2h_q;
+  tlul_pkg::tl_h2d_t tl_sram_b_h2d;
+  tlul_pkg::tl_d2h_t tl_sram_b_d2h;
+  tlul_pkg::tl_h2d_t tl_hyperram_us_h2d[2];
+  tlul_pkg::tl_d2h_t tl_hyperram_us_d2h[2];
+  tlul_pkg::tl_h2d_t tl_hyperram_ds_h2d;
+  tlul_pkg::tl_d2h_t tl_hyperram_ds_d2h;
   tlul_pkg::tl_h2d_t tl_gpio_h2d;
   tlul_pkg::tl_d2h_t tl_gpio_d2h;
   tlul_pkg::tl_h2d_t tl_rpi_gpio_h2d;
@@ -516,7 +535,7 @@ module sonata_system #(
   tlul_pkg::tl_h2d_t tl_rev_h2d;
   tlul_pkg::tl_d2h_t tl_rev_d2h;
 
-  xbar_main xbar (
+  xbar_main u_xbar_main (
     // Clock and reset.
     .clk_sys_i        (clk_sys_i),
     .rst_sys_ni       (rst_sys_ni),
@@ -530,8 +549,10 @@ module sonata_system #(
     .tl_dbg_host_o    (tl_dbg_host_d2h_q),
 
     // Device interfaces.
-    .tl_sram_o        (tl_sram_h2d_d),
-    .tl_sram_i        (tl_sram_d2h_d),
+    .tl_sram_o        (tl_sram_a_h2d_d),
+    .tl_sram_i        (tl_sram_a_d2h_d),
+    .tl_hyperram_o    (tl_hyperram_us_h2d[0]),
+    .tl_hyperram_i    (tl_hyperram_us_d2h[0]),
     .tl_rev_tag_o     (tl_rev_h2d),
     .tl_rev_tag_i     (tl_rev_d2h),
     .tl_gpio_o        (tl_gpio_h2d),
@@ -582,6 +603,21 @@ module sonata_system #(
     .tl_rv_plic_i     (tl_rv_plic_d2h),
 
     .scanmode_i       (prim_mubi_pkg::MuBi4False)
+  );
+
+  xbar_ifetch u_xbar_ifetch (
+    // Clock and reset.
+    .clk_sys_i        (clk_sys_i),
+    .rst_sys_ni       (rst_sys_ni),
+    .tl_ibex_ifetch_i (tl_ibex_ins_h2d),
+    .tl_ibex_ifetch_o (tl_ibex_ins_d2h),
+
+    .tl_sram_o     (tl_sram_b_h2d),
+    .tl_sram_i     (tl_sram_b_d2h),
+    .tl_hyperram_o (tl_hyperram_us_h2d[1]),
+    .tl_hyperram_i (tl_hyperram_us_d2h[1]),
+
+    .scanmode_i (prim_mubi_pkg::MuBi4False)
   );
 
   // TL-UL host adapter(s).
@@ -709,14 +745,14 @@ module sonata_system #(
     .RspPass  ( 0 ),
     .ReqDepth ( 2 ),
     .RspDepth ( 2 )
-  ) tl_sram_fifo (
+  ) tl_sram__a_fifo (
     .clk_i       (clk_sys_i),
     .rst_ni      (rst_sys_ni),
 
-    .tl_h_i      (tl_sram_h2d_d),
-    .tl_h_o      (tl_sram_d2h_d),
-    .tl_d_o      (tl_sram_h2d_q),
-    .tl_d_i      (tl_sram_d2h_q),
+    .tl_h_i      (tl_sram_a_h2d_d),
+    .tl_h_o      (tl_sram_a_d2h_d),
+    .tl_d_o      (tl_sram_a_h2d_q),
+    .tl_d_i      (tl_sram_a_d2h_q),
 
     .spare_req_i (1'b0),
     .spare_req_o (    ),
@@ -733,10 +769,73 @@ module sonata_system #(
     .clk_i  (clk_sys_i),
     .rst_ni (rst_sys_ni),
 
-    .tl_a_i (tl_sram_h2d_q),
-    .tl_a_o (tl_sram_d2h_q),
-    .tl_b_i (tl_ibex_ins_h2d),
-    .tl_b_o (tl_ibex_ins_d2h)
+    .tl_a_i (tl_sram_a_h2d_q),
+    .tl_a_o (tl_sram_a_d2h_q),
+    .tl_b_i (tl_sram_b_h2d),
+    .tl_b_o (tl_sram_b_d2h)
+  );
+
+  // Manual M:1 socket instantiation as xbar generator cannot deal with multiple ports for one
+  // device and we want to utilize the dual port SRAM. So totally seperate crossbars are generated
+  // for the dside and iside then tlul_socket_m1 is used here to connect the two crossbars to the
+  // one downstream hyperram tilelink port.
+  tlul_socket_m1 #(
+    .HReqDepth (8'h0),
+    .HRspDepth (8'h0),
+    .DReqDepth (4'h0),
+    .DRspDepth (4'h0),
+    .M         (2)
+  ) u_hyperram_tl_socket (
+    .clk_i (clk_sys_i),
+    .rst_ni(rst_sys_ni),
+    .tl_h_i(tl_hyperram_us_h2d),
+    .tl_h_o(tl_hyperram_us_d2h),
+    .tl_d_o(tl_hyperram_ds_h2d),
+    .tl_d_i(tl_hyperram_ds_d2h)
+  );
+
+  //hbmc_tl_axi_wrapper #(
+  //  .HRClkFreq(HRClkFreq)
+  //) u_hyperram (
+  //  .clk_peri_i(clk_sys_i),
+  //  .rst_peri_ni(rst_sys_ni),
+
+  //  .clk_hr_i,
+  //  .clk_hr90p_i,
+  //  .clk_hr3x_i,
+  //  .rst_hrn_i(rst_sys_ni),
+
+  //  .tl_i(tl_hyperram_ds_h2d),
+  //  .tl_o(tl_hyperram_ds_d2h),
+
+  //  .HYPERRAM_DQ,
+  //  .HYPERRAM_RWDS,
+  //  .HYPERRAM_CKP,
+  //  .HYPERRAM_CKN,
+  //  .HYPERRAM_nRST,
+  //  .HYPERRAM_CS
+  //);
+
+  hyperram #(
+    .HRClkFreq(HRClkFreq),
+    .HRSize   (HRSize)
+  ) u_hyperram (
+    .clk_i      (clk_sys_i),
+    .rst_ni     (rst_sys_ni),
+
+    .clk_hr_i,
+    .clk_hr90p_i,
+    .clk_hr3x_i,
+
+    .tl_i        (tl_hyperram_ds_h2d),
+    .tl_o        (tl_hyperram_ds_d2h),
+
+    .hyperram_dq,
+    .hyperram_rwds,
+    .hyperram_ckp,
+    .hyperram_ckn,
+    .hyperram_nrst,
+    .hyperram_cs
   );
 
   tlul_adapter_reg #(
@@ -1397,7 +1496,7 @@ module sonata_system #(
     .cio_usb_dn_en_o              (usb_dn_en_o),
     .usb_tx_se0_o                 (),
     .usb_tx_d_o                   (),
- 
+
     // Non-data I/O
     .cio_sense_i                  (usb_sense_i),
     .usb_dp_pullup_o              (usb_dp_pullup_o),

@@ -23,6 +23,9 @@ module sram #(
     output tlul_pkg::tl_d2h_t tl_b_o
   );
 
+  // Bit offset of word address.
+  localparam int unsigned AOff = $clog2(DataWidth / 8);
+
   // There may be a single capability tag bit for every 64 bits of data;
   // bus words may be at most 64 bits wide and the tag bit associated with
   // the group of 64 bits is updated on every write to any of those 64 bits.
@@ -34,8 +37,6 @@ module sram #(
   // 64 bits as not containing a valid capability.
   localparam int unsigned TOff = (SingleTagPerCap == 1) ? (3 - AOff) : 0;
 
-  // Bit offset of word address.
-  localparam int unsigned AOff = $clog2(DataWidth / 8);
   // Number of address bits to select a word from the SRAM.
   localparam int unsigned SramAw = AddrWidth - AOff;
 
@@ -69,7 +70,7 @@ module sram #(
     .tl_o        (tl_a_o),
 
     // Control interface.
-    .en_ifetch_i (prim_mubi_pkg::MuBi4False),
+    .en_ifetch_i (prim_mubi_pkg::MuBi4True),
 
     // SRAM interface.
     .req_o       (mem_a_req),

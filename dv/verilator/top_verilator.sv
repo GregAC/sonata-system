@@ -6,7 +6,7 @@
 module top_verilator (input logic clk_i, rst_ni);
 
   localparam ClockFrequency = 30_000_000;
-  localparam BaudRate       = 115_200;
+  localparam BaudRate       = 921_600;
   localparam EnableCHERI    = 1'b1;
 
   logic uart_sys_rx, uart_sys_tx;
@@ -43,6 +43,11 @@ module top_verilator (input logic clk_i, rst_ni);
     // USB device clock and reset
     .clk_usb_i      (clk_usb),
     .rst_usb_ni     (rst_usb_n),
+
+    // SRAM model used for hyperram so no hyperram clock is provided
+    .clk_hr_i   (1'b0),
+    .clk_hr90p_i(1'b0),
+    .clk_hr3x_i (1'b0),
 
     .gp_i     (0),
     .gp_o     ( ),
@@ -145,7 +150,15 @@ module top_verilator (input logic clk_i, rst_ni);
     .td_i   ('0),
     .td_o   (),
 
-    .rgbled_dout_o ()
+    .rgbled_dout_o (),
+
+    // SRAM model used for hyperram so don't connect hyperram IO
+    .hyperram_dq  (),
+    .hyperram_rwds(),
+    .hyperram_ckp (),
+    .hyperram_ckn (),
+    .hyperram_nrst(),
+    .hyperram_cs  ()
   );
 
   // Virtual UART

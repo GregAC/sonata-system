@@ -13,11 +13,14 @@ filesets:
       - lowrisc:ip:uart
       - lowrisc:ip:usbdev
       - lowrisc:ip:xbar_main
+      - lowrisc:ip:xbar_ifetch
       - lowrisc:ip:spi
       - lowrisc:ip:rgbled_ctrl
+      - lowrisc:ip:hyperram
       - lowrisc:opentitan:top_earlgrey_rv_plic
       - lowrisc:tlul:adapter_host
       - lowrisc:tlul:adapter_reg
+
     files:
       - rtl/system/jtag_id_pkg.sv
       - rtl/system/sonata_system.sv

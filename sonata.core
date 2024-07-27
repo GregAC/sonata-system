@@ -58,6 +58,11 @@ parameters:
     paramtype: vlogdefine
     description: Primitives implementation to use, e.g. "prim_pkg::ImplGeneric".
 
+  USE_HYPERRAM_SIM_MODEL:
+    datatype: bool
+    paramtype: vlogdefine
+    description: Use an SRAM simulation model rather than the real hyperram controller
+
 targets:
   default: &default_target
     filesets:
@@ -103,6 +108,7 @@ targets:
           - "--unroll-count 72"
     parameters:
       - PRIM_DEFAULT_IMPL=prim_pkg::ImplGeneric
+      - USE_HYPERRAM_SIM_MODEL=true
 
   lint:
     <<: *default_target

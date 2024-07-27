@@ -400,6 +400,4 @@ module prim_ram_1p_scr import prim_ram_1p_pkg::*; #(
     .cfg_i
   );
 
-  `include "prim_util_get_scramble_params.svh"
-
 endmodule : prim_ram_1p_scr

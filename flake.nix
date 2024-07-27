@@ -123,7 +123,8 @@
             # For legacy software
             lowrisc-toolchain-gcc-rv32imcb
           ])
-          ++ (with sonata-simulator; buildInputs ++ nativeBuildInputs);
+          ++ (with sonata-simulator; buildInputs ++ nativeBuildInputs) ++
+          cheriotPkgs;
       };
       packages = {inherit sonata-simulator sonata-sim-boot-stub sonata-documentation;};
       checks = {inherit sonata-simulator-lint;};

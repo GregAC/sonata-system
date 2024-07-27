@@ -29,7 +29,7 @@ string(CONCAT CMAKE_CXX_FLAGS_INIT
 
 string(CONCAT CMAKE_C_FLAGS_INIT
   "-mcpu=cheriot -mabi=cheriot -mxcheri-rvc -mrelax -fshort-wchar"
-  " -Os -g -fomit-frame-pointer -fno-builtin -Wall -Werror"
+  " -Os -g -fomit-frame-pointer -fno-builtin -fno-inline -Wall -Werror"
   " -fno-asynchronous-unwind-tables -fvisibility=hidden -fvisibility-inlines-hidden"
 )
 
